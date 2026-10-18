@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../config/config.dart';
 import 'package:flutter/material.dart';
@@ -17,24 +19,47 @@ class ApiService {
 //effectue une requête POST à l'endpoint de connexion de l'API,
 //et retourne le token d'authentification si la connexion est réussie.
   static Future<String?> login(String username, String password) async {
+    late final http.Response response;
     try {
-      final response = await http
+      response = await http
           .post(
             Uri.parse('${AppConfig.baseUrl}/auth/login'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'username': username, 'password': password}),
           )
-          .timeout(const Duration(seconds: 4));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        _token = data['token'];
-        return _token;
-      }
-      return null;
-    } catch (e) {
-      return null; // timeout ou erreur réseau → retourne null proprement
+          .timeout(const Duration(seconds: 10));
+    } on TimeoutException {
+      throw Exception(
+          'Le serveur ne répond pas. Vérifiez la connexion au back.');
+    } on SocketException {
+      throw Exception(
+        'Impossible de joindre le serveur. Vérifiez adb reverse et le port 3000.',
+      );
+    } on http.ClientException {
+      throw Exception(
+        'Impossible de joindre le serveur. Vérifiez adb reverse et le port 3000.',
+      );
     }
+
+    if (response.statusCode == 200) {
+      try {
+        final data = jsonDecode(response.body);
+        if (data is! Map<String, dynamic> || data['token'] is! String) {
+          throw Exception(
+              'Réponse de connexion invalide envoyée par le serveur.');
+        }
+        _token = data['token'] as String;
+        return _token;
+      } on FormatException {
+        throw Exception(
+            'Réponse de connexion invalide envoyée par le serveur.');
+      }
+    }
+
+    if (response.statusCode == 401 || response.statusCode == 403) return null;
+
+    throw Exception(
+        'Erreur du serveur pendant la connexion (HTTP ${response.statusCode}).');
   }
 
 // getMe permet de récupérer les informations de l'utilisateur connecté en effectuant

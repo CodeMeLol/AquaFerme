@@ -62,7 +62,9 @@ class _LoginScreenState extends State<LoginScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur de connexion : vérifiez le réseau.'),
+            content: Text(
+              'Erreur de connexion : ${e.toString().replaceFirst('Exception: ', '')}',
+            ),
             backgroundColor: Colors.redAccent,
           ),
         );
